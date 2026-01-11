@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BestAI</title> <!-- Renamed -->
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+    <div class="sidebar">
+        <button class="new-chat-btn" onclick="startNewChat()">
+            <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" height="16" width="16"
+                xmlns="http://www.w3.org/2000/svg">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            New chat
+        </button>
+        <div class="history-list" id="history-list">
+            <!-- Chat history items will appear here -->
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="model-bar">
+            <div class="model-picker">
+                BestAI <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" height="16"
+                    width="16" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chat-messages">
+            <div id="empty-state" class="empty-state">
+                <div class="logo-big">
+                    <img src="static/ai image.png" alt="AI Logo" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <h2>How can I help you today?</h2>
+            </div>
+        </div>
+
+        <div class="input-area-container">
+            <div class="input-box">
+                <button class="send-btn" style="background:transparent; color:#b4b4b4;">
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" height="20" width="20"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+
+                <textarea id="user-input" rows="1" placeholder="Search whatever you want"></textarea>
+
+                <button id="send-button" class="send-btn" disabled>
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" height="16" width="16"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div style="position: absolute; bottom: 8px; font-size: 11px; color: #777;">
+                AI can make mistakes. Check important info.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentChatId = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            loadChatHistory();
+        });
+
+        document.getElementById('send-button').addEventListener('click', sendMessage);
+        const textarea = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-button');
+        const emptyState = document.getElementById('empty-state');
+        const chatMessages = document.getElementById('chat-messages');
+
+        textarea.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        textarea.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+
+            if (this.value.trim().length > 0) {
+                sendBtn.removeAttribute('disabled');
+                sendBtn.style.background = 'white';
+                sendBtn.style.color = 'black';
+            } else {
+                sendBtn.setAttribute('disabled', 'true');
+                sendBtn.style.background = '#3c3c3c';
+                sendBtn.style.color = 'white';
+                this.style.height = '24px';
+            }
+        });
+
+        function startNewChat() {
+            currentChatId = null;
+            chatMessages.innerHTML = '';
+            chatMessages.appendChild(emptyState);
+            emptyState.style.display = 'flex';
+        }
+
+        async function loadChatHistory() {
+            try {
+                const response = await fetch('/chats');
+                const chats = await response.json();
+                const list = document.getElementById('history-list');
+                list.innerHTML = '';
+                chats.forEach(chat => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.innerText = chat.title;
+                    item.onclick = () => loadChat(chat.id);
+                    list.appendChild(item); // Append to bottom (or prepend? chatgpt prepends usually)
+                    // Let's prepend to show newest at top if the API didn't sort
+                    // list.insertBefore(item, list.firstChild); 
+                });
+            } catch (e) {
+                console.error("Failed to load history", e);
+            }
+        }
+
+        async function loadChat(chatId) {
+            currentChatId = chatId;
+            try {
+                const response = await fetch(`/chat/${chatId}`);
+                const chat = await response.json();
+
+                chatMessages.innerHTML = ''; // Clear current view
+
+                // Hide empty state
+                // Since we cleared innerHTML, emptyState is gone from DOM. 
+                // We should re-append emptyState hidden if we want to reuse it, or just create new divs.
+                // Simpler: Just render messages.
+
+                chat.messages.forEach(msg => {
+                    addMessage(msg.text, msg.sender, false);
+                });
+
+            } catch (e) {
+                console.error("Failed to load chat", e);
+            }
+        }
+
+
+        async function sendMessage() {
+            const userInput = document.getElementById('user-input');
+            const question = userInput.value.trim();
+
+            if (!question) return;
+
+            // Check if empty state is visible and hide it
+            if (document.getElementById('empty-state')) {
+                document.getElementById('empty-state').style.display = 'none';
+            }
+
+            userInput.value = '';
+            userInput.style.height = '24px';
+            sendBtn.setAttribute('disabled', 'true');
+            sendBtn.style.background = '#3c3c3c';
+            sendBtn.style.color = 'white';
+
+            addMessage(question, 'user');
+
+            const loadingId = addMessage('Thinking...', 'ai', true);
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        chat_id: currentChatId
+                    }),
+                });
+                const data = await response.json();
+
+                // Update current Chat ID if it was new
+                if (data.chat_id) {
+                    if (currentChatId !== data.chat_id) {
+                        currentChatId = data.chat_id;
+                        // Refresh history to show new item
+                        loadChatHistory();
+                    }
+                }
+
+                const loadingElement = document.getElementById(loadingId);
+                if (loadingElement) {
+                    loadingElement.innerText = '';
+                    if (data.combined_response) {
+                        typeWriter(data.combined_response, loadingElement);
+                    } else if (data.error) {
+                        loadingElement.innerText = 'Error: ' + data.error;
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                const loadingElement = document.getElementById(loadingId);
+                if (loadingElement) loadingElement.innerText = 'Failed to get a response.';
+            }
+        }
+
+        function addMessage(text, sender, isLoading = false) {
+            let wrapper = document.createElement('div');
+            wrapper.classList.add('message-wrapper', sender);
+
+            let content = document.createElement('div');
+            content.classList.add('message-content');
+
+            if (sender === 'ai') {
+                const avatar = document.createElement('div');
+                avatar.classList.add('avatar', sender);
+                avatar.innerHTML = '<img src="static/ai image.png" alt="AI" style="width:100%; height:100%; object-fit:cover;">';
+                content.appendChild(avatar);
+            }
+
+            const textContent = document.createElement('div');
+            textContent.classList.add('text');
+            if (sender === 'user') {
+                content.classList.add('message-bubble');
+            }
+            content.appendChild(textContent);
+
+            if (sender === 'user') {
+                const avatar = document.createElement('div');
+                avatar.classList.add('avatar', sender);
+                avatar.innerHTML = '<img src="static/my logo.png" alt="Me" style="width:100%; height:100%; object-fit:cover;">';
+                content.appendChild(avatar);
+            }
+
+            wrapper.appendChild(content);
+
+            if (isLoading) {
+                const id = 'loading-' + Date.now();
+                textContent.id = id;
+                textContent.innerText = text;
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                return id;
+            } else {
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                textContent.innerText = text;
+            }
+            return null;
+        }
+
+        function typeWriter(text, element) {
+            let i = 0;
+            element.innerText = '';
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, 5);
+                }
+            }
+            type();
+        }
+    </script>
+</body>
+
+</html>
