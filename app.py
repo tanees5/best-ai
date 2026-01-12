@@ -86,7 +86,7 @@ def summarize_responses(question, responses):
 """
     for idx, (model_name, response_text) in enumerate(responses.items()):
         summary_prompt += f"**Response {idx + 1}:** {response_text}\n"
-
+   
     try:
         summary_completion = nvidia_client.chat.completions.create(
             model="nvidia/nvidia-nemotron-nano-9b-v2", # Using Nemotron for summarization
@@ -160,12 +160,11 @@ def ask_models():
 
     chats = load_chats()
     
-    # Create new chat if no ID or ID not found
+    # Create new chat if needed
     is_new_chat = False
     if not chat_id or chat_id not in chats:
         is_new_chat = True
         chat_id = str(uuid.uuid4())
-        # Generate simple title from first question
         title = user_question[:30] + "..." if len(user_question) > 30 else user_question
         chats[chat_id] = {
             "title": title,
@@ -175,69 +174,106 @@ def ask_models():
     # 1. Add User Message
     chats[chat_id]["messages"].append({"sender": "user", "text": user_question})
 
-    # ... (Keep existing AI logic) ...
-    
-    # Placeholder for integrating with Qwen, Claude, Perplexity
-    nemotron_response = ""
-    if NVIDIA_API_KEY:
+    final_response = ""
+    used_model = "Unknown"
+
+    # --- MASTER AI ROUTING ---
+    if MOONSHOT_API_KEY:
         try:
-            qwen_completion = nvidia_client.chat.completions.create(
-                model="nvidia/nvidia-nemotron-nano-9b-v2", # Using Nemotron for direct question
-                messages=[
-                    {"role": "user", "content": user_question}
-                ],
-                temperature=0.6,
-                top_p=0.95,
-                max_tokens=2048,
-                stream=False, # Changed to False for direct response output
-                extra_body={
-                    "min_thinking_tokens": 1024,
-                    "max_thinking_tokens": 2048
-                }
+            # 1. Classify Intent using Moonshot
+            classification_prompt = f"""
+            You are the Master AI Router. Analyze the following user request and classify it into exactly one of these categories:
+            - ART (if the request involves generating images, describing art, or visual creativity)
+            - WRITING (if the request involves creative writing, stories, essays, or editing text)
+            - CODING (if the request involves programming, debugging, or technical explanation of code)
+            - OTHER (for anything else)
+            
+            User Request: "{user_question}"
+            
+            Reply ONLY with the category name (ART, WRITING, CODING, or OTHER).
+            """
+            
+            router_completion = moonshot_client.chat.completions.create(
+                model="moonshotai/kimi-k2-instruct-0905",
+                messages=[{"role": "user", "content": classification_prompt}],
+                temperature=0.1, # Low temp for determinism
+                max_tokens=10
             )
-            nemotron_response = qwen_completion.choices[0].message.content
+            intent = router_completion.choices[0].message.content.strip().upper()
+            print(f"DEBUG: Intent classified as {intent}") # Useful for server logs
+
+            # 2. Route based on Intent
+            if "ART" in intent:
+                # Use NVIDIA (Nemotron) for Art
+                used_model = "NVIDIA (Art)"
+                if NVIDIA_API_KEY:
+                    nvidia_completion = nvidia_client.chat.completions.create(
+                        model="nvidia/nvidia-nemotron-nano-9b-v2",
+                        messages=[{"role": "user", "content": user_question}],
+                        temperature=0.7,
+                        max_tokens=2048,
+                        extra_body={"min_thinking_tokens": 0,"max_thinking_tokens": 0} # Disable thinking for speed or enable per preference
+                    )
+                    final_response = nvidia_completion.choices[0].message.content
+                else:
+                    final_response = "NVIDIA API Key missing for Art task."
+
+            elif "WRITING" in intent:
+                # Use GPT-OSS 120B for Writing
+                used_model = "GPT-OSS 120B (Writing)"
+                if GPTOSS120B_API_KEY:
+                    gpt_completion = gptoss120b_client.chat.completions.create(
+                        model="openai/gpt-oss-120b",
+                        messages=[{"role": "user", "content": user_question}],
+                        temperature=0.9, # Higher creative
+                        max_tokens=4096
+                    )
+                    final_response = gpt_completion.choices[0].message.content
+                else:
+                    final_response = "GPT-OSS 120B API Key missing for Writing task."
+
+            elif "CODING" in intent:
+                # Use Moonshot itself for Coding
+                used_model = "Moonshot (Coding)"
+                # Reuse client
+                params = {
+                    "model": "moonshotai/kimi-k2-instruct-0905",
+                    "messages": [{"role": "user", "content": user_question}],
+                    "temperature": 0.2, # Low temp for code
+                    "max_tokens": 4096
+                }
+                moonshot_exec = moonshot_client.chat.completions.create(**params)
+                final_response = moonshot_exec.choices[0].message.content
+
+            else:
+                # Default to Moonshot for General/Other
+                used_model = "Moonshot (General)"
+                params = {
+                    "model": "moonshotai/kimi-k2-instruct-0905",
+                    "messages": [{"role": "user", "content": user_question}],
+                    "temperature": 0.5,
+                    "max_tokens": 4096
+                }
+                moonshot_exec = moonshot_client.chat.completions.create(**params)
+                final_response = moonshot_exec.choices[0].message.content
+
         except Exception as e:
-            nemotron_response = f"Error from AI service 1: {e}"
+            final_response = f"Master AI Error: {e}"
+            print(f"Error: {e}")
     else:
-        nemotron_response = "AI service 1 not configured."
-    
-    # ... (Other Models) ...
-    # Skip for brevity, assuming we keep the combined logic or just use Nemotron for speed in this demo
-    
-    # Simplified Logic for Demo Speed/Reliability (since we are focusing on UI/History)
-    # In production, keep all the multi-model logic.
-    # For this refactor, I will preserve the existing summarization flow but ensure it saves.
-    
-    # DO THE SAME SUMMARY LOGIC AS BEFORE...
-    # (Skipping re-writing all model calls here to save tokens, but in real code we must preserve. 
-    #  I will just use a simpler response for the "example" or assume logic exists)
-    
-    # For now, let's just use the Nemotron response as the "combined" one to be safe and fast, 
-    # OR replicate the original flow.
-    # Let's assume the original flow produces `simplified_summary`.
-    
-    # RE-INSERTING ORIGINAL LOGIC ABBREVIATED:
-    responses = { "Response 1": nemotron_response } 
-    # ... (Add others if keys exist)
-    
-    combined_summary = summarize_responses(user_question, responses)
-    if "No common points found." in combined_summary:
-        final_summary = nemotron_response
-    else:
-        final_summary = combined_summary
-    
-    simplified_summary = simplify_summary(final_summary)
+        final_response = "Master AI (Moonshot) Key not configured."
     
     # 2. Add AI Message
-    chats[chat_id]["messages"].append({"sender": "ai", "text": simplified_summary})
+    chats[chat_id]["messages"].append({"sender": "ai", "text": final_response})
     
     # Save
     save_chats(chats)
 
     return jsonify({
-        "combined_response": simplified_summary,
+        "combined_response": final_response, # Frontend expects this key
         "chat_id": chat_id,
-        "title": chats[chat_id]["title"] if is_new_chat else None
+        "title": chats[chat_id]["title"] if is_new_chat else None,
+        "used_model": used_model # Optional info if we want to show it later
     })
 
 if __name__ == '__main__':

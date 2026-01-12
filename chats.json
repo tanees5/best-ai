@@ -74,5 +74,18 @@
                 "text": "Sure! Here\u2019s a friendlier, bite\u2011size overview of Pakistan:\n\n---\n\n**Pakistan at a glance**\n\n- **Where is it?**  \n  A South\u2011Asian country that shares borders with India, China, Iran and Afghanistan.\n\n- **What\u2019s the population like?**  \n  Over 240\u202fmillion people from many different ethnic groups and cultures.\n\n- **Capital city**  \n  Islamabad (Karachi was the capital before independence).\n\n- **Languages**  \n  Urdu is the national language, English is widely spoken, and regional tongues such as Punjabi, Sindhi and Pashto add to the linguistic mix.\n\n- **A quick history lesson**  \n  Pakistan came into being in 1947 when British India was split, creating a new nation for the Muslim majority.\n\n- **Culture highlights**  \n  \u2022 Colorful festivals and traditions  \n  \u2022 Soul\u2011stirring Sufi music  \n  \u2022 Rich literary heritage  \n  \u2022 Ancient wonders like the Indus\u2011valley sites of Mohenjo\u2011Daro and Harappa\n\n- **Economy**  \n  A blend of agriculture, industry and services. While it faces economic challenges, the tech/start\u2011up scene is on the rise.\n\n- **Politics**  \n  A parliamentary republic with a dynamic (and sometimes complex) political environment, including ongoing reforms and security matters.\n\n- **Geography**  \n  From snow\u2011capped Himalayan peaks in the north to the sunny shores of the Arabian Sea in the south, the landscape is incredibly diverse.\n\n---\n\nGot a specific question\u2014maybe about Pakistan\u2019s history, food, travel tips, or current events? Just let me know!"
             }
         ]
+    },
+    "d446f003-c694-4c5d-ba3f-706eb5be6ea9": {
+        "title": "make me a code in python that ...",
+        "messages": [
+            {
+                "sender": "user",
+                "text": "make me a code in python that will check the time"
+            },
+            {
+                "sender": "ai",
+                "text": "Here's a simple Python script that checks and displays the current time:\n\n```python\nfrom datetime import datetime\n\ndef check_time():\n    current_time = datetime.now()\n    print(\"Current time:\", current_time.strftime(\"%H:%M:%S\"))\n\nif __name__ == \"__main__\":\n    check_time()\n```\n\nSave this as `check_time.py` and run it. It will print the current time in HH:MM:SS format."
+            }
+        ]
     }
 }
